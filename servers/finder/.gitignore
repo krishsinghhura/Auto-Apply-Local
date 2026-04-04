@@ -22,8 +22,6 @@ test_people_finder.py
 
 # Sensitive Data (REQUIRED for LinkedIn credentials)
 .env
-*.pkl
-session_test.pkl
 
 # macOS
 .DS_Store
