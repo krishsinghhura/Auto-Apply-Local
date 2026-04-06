@@ -18,10 +18,8 @@ coverage.xml
 *.log
 .mypy_cache/
 .pytest_cache/
-test_people_finder.py
 
 # Sensitive Data (REQUIRED for LinkedIn credentials)
-.env
 
 # macOS
 .DS_Store
