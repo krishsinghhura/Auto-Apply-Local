@@ -8,6 +8,7 @@ class Staff(BaseModel):
     headline: Optional[str] = None
     profile_link: Optional[str] = None
     search_term: Optional[str] = None
+    email: Optional[str] = None
 
     def to_dict(self):
         return self.model_dump()
