@@ -44,11 +44,19 @@ func NewGroqClient(cfg *config.Config) *GroqClient {
 }
 
 func (c *GroqClient) Chat(model string, prompt string) (string, error) {
+	return c.ChatWithSystem(model, "", prompt)
+}
+
+func (c *GroqClient) ChatWithSystem(model string, systemPrompt string, userPrompt string) (string, error) {
+	messages := []Message{}
+	if systemPrompt != "" {
+		messages = append(messages, Message{Role: "system", Content: systemPrompt})
+	}
+	messages = append(messages, Message{Role: "user", Content: userPrompt})
+
 	reqBody := ChatCompletionRequest{
-		Model: model,
-		Messages: []Message{
-			{Role: "user", Content: prompt},
-		},
+		Model:    model,
+		Messages: messages,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
