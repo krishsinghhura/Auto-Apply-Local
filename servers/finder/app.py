@@ -6,9 +6,7 @@ from flask_cors import CORS
 
 from services.people_finder.linkedIn import (
     LinkedInAuthenticator, 
-    PickleSessionStorage, 
     CookieAuthStrategy, 
-    ProgrammaticAuthStrategy,
     LinkedInScraperClient,
     LinkedInPeopleFinder,
     EmailEnricher
@@ -54,25 +52,20 @@ def get_services():
     if _finder_instance is None:
         load_env()
         
+        # Purely manual-entry cookies from .env
         strategies = []
         if os.environ.get("LI_AT") and os.environ.get("JSESSIONID"):
             strategies.append(CookieAuthStrategy(os.environ["LI_AT"], os.environ["JSESSIONID"]))
         
-        if os.environ.get("LINKEDIN_USERNAME") and os.environ.get("LINKEDIN_PASSWORD"):
-            strategies.append(ProgrammaticAuthStrategy(os.environ["LINKEDIN_USERNAME"], os.environ["LINKEDIN_PASSWORD"]))
-
-        authenticator = LinkedInAuthenticator(
-            storage=PickleSessionStorage("session_test.pkl"),
-            strategies=strategies
-        )
+        authenticator = LinkedInAuthenticator(strategies=strategies)
         
         try:
             session = authenticator.get_session()
             _finder_instance = LinkedInPeopleFinder(LinkedInScraperClient(session))
             _enricher_instance = EmailEnricher(os.environ.get("APIFY_API_KEY"))
-            logger.info("Services initialized successfully.")
+            logger.info("✅ LinkedIn Services online via .env cookies.")
         except Exception as e:
-            logger.error(f"Initialization failure: {e}")
+            logger.error(f"❌ Initialization failed: {e}")
             raise
     return _finder_instance, _enricher_instance
 
@@ -94,24 +87,38 @@ def find_people():
         results_gen = finder.find_people(company_name=company, max_results=max_results)
         
         final_results = []
+        urls_to_enrich = []
+        
         for person in results_gen:
             data = person.to_dict()
             url = data.get("profile_link")
             
-            if enrich and enricher and url:
-                # Check cache first to avoid hitting Apify again and again
+            if enrich and enricher and url and "headless" not in url:
                 if url in cache:
-                    logger.info(f"Using cached email for {url}")
                     data['email'] = cache[url]
                 else:
-                    email = enricher.find_email(url)
-                    if email:
-                        cache[url] = email
-                        save_cache(cache)
-                    data['email'] = email
+                    urls_to_enrich.append(url)
             
             final_results.append(data)
-
+            
+        if urls_to_enrich:
+            logger.info(f"Enriching {len(urls_to_enrich)} profiles...")
+            batch_results = enricher.find_emails_batch(urls_to_enrich)
+            
+            cache_updated = False
+            for data in final_results:
+                url = data.get("profile_link")
+                if url:
+                    clean_url = url.split('?')[0].rstrip('/')
+                    if clean_url in batch_results:
+                        email_addr = batch_results[clean_url]
+                        data['email'] = email_addr
+                        cache[url] = email_addr
+                        cache_updated = True
+            
+            if cache_updated:
+                save_cache(cache)
+        
         return jsonify({"company": company, "results": final_results}), 200
     except Exception as e:
         logger.exception("Search error")
