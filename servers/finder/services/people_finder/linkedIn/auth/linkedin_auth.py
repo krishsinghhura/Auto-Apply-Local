@@ -2,7 +2,7 @@ import os
 import logging
 import requests
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional, List, Any
 
 logger = logging.getLogger(__name__)
 
